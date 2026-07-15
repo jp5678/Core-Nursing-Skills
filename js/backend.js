@@ -17,6 +17,7 @@ const cache = {
 };
 
 export function isRemote() {
+  if (globalThis.__FORCE_LOCAL_MODE__) return false; // 단위 테스트용
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 

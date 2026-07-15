@@ -18,6 +18,7 @@ const KEYS = {
   session: `${PREFIX}session`,
   seeded: `${PREFIX}seeded.v1`,
   demoUpgraded: `${PREFIX}migration.demoFullCompletion`,
+  demoEmails: `${PREFIX}migration.demoEmailsV2`,
 };
 
 function read(key, fallback) {
@@ -254,14 +255,14 @@ export function setSession(session) {
 
 /* ===== 시드 데이터 ===== */
 const SEED_STUDENTS = [
-  { grade: 2, classNo: "A", studentNo: "20240101", name: "김하은", email: "haeun.kim@scjc.ac.kr" },
-  { grade: 2, classNo: "A", studentNo: "20240102", name: "이서준", email: "seojun.lee@scjc.ac.kr" },
-  { grade: 2, classNo: "B", studentNo: "20240115", name: "박지우", email: "jiwoo.park@scjc.ac.kr" },
-  { grade: 3, classNo: "A", studentNo: "20230207", name: "최민서", email: "minseo.choi@scjc.ac.kr" },
-  { grade: 3, classNo: "B", studentNo: "20230221", name: "정도윤", email: "doyun.jung@scjc.ac.kr" },
-  { grade: 4, classNo: "A", studentNo: "20220304", name: "강수아", email: "sua.kang@scjc.ac.kr" },
-  { grade: 4, classNo: "A", studentNo: "20220311", name: "윤시우", email: "siwoo.yoon@scjc.ac.kr" },
-  { grade: 1, classNo: "C", studentNo: "20250412", name: "임예린", email: "yerin.lim@scjc.ac.kr" },
+  { grade: 2, classNo: "A", studentNo: "20240101", name: "김하은", email: "s001@scjc.ac.kr" },
+  { grade: 2, classNo: "A", studentNo: "20240102", name: "이서준", email: "s002@scjc.ac.kr" },
+  { grade: 2, classNo: "B", studentNo: "20240115", name: "박지우", email: "s003@scjc.ac.kr" },
+  { grade: 3, classNo: "A", studentNo: "20230207", name: "최민서", email: "s004@scjc.ac.kr" },
+  { grade: 3, classNo: "B", studentNo: "20230221", name: "정도윤", email: "s005@scjc.ac.kr" },
+  { grade: 4, classNo: "A", studentNo: "20220304", name: "강수아", email: "s006@scjc.ac.kr" },
+  { grade: 4, classNo: "A", studentNo: "20220311", name: "윤시우", email: "s007@scjc.ac.kr" },
+  { grade: 1, classNo: "C", studentNo: "20250412", name: "임예린", email: "s008@scjc.ac.kr" },
 ];
 
 export function seedIfEmpty() {
@@ -290,6 +291,20 @@ export function seedIfEmpty() {
     write(KEYS.seeded, true);
   }
   upgradeDemoStudent();
+  migrateDemoEmails();
+}
+
+// 구버전 시드의 데모 학생 이메일을 s001~s008@scjc.ac.kr 로 1회 변경
+function migrateDemoEmails() {
+  if (read(KEYS.demoEmails, false)) return;
+  const emailByStudentNo = Object.fromEntries(
+    SEED_STUDENTS.map((s) => [s.studentNo, s.email])
+  );
+  const next = getStudents().map((s) =>
+    emailByStudentNo[s.studentNo] ? { ...s, email: emailByStudentNo[s.studentNo] } : s
+  );
+  write(KEYS.students, next);
+  write(KEYS.demoEmails, true);
 }
 
 // 데모 학생(학번 20240101)을 전 항목 이수 + 수료증 발급 상태로 승격
