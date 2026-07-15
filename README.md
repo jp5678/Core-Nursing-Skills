@@ -59,7 +59,15 @@ js/views/           login / dashboard / students / videos /
 docs/design.md      설계 문서
 ```
 
-## Google 로그인 설정
+## 데이터 저장 — Supabase 연동 (권장)
+
+기본값은 브라우저 localStorage 데모 모드입니다(사용자 간 데이터가 공유되지 않음).
+**[docs/supabase-setup.md](docs/supabase-setup.md)** 가이드에 따라 Supabase(무료)를 연결하면
+공유 데이터베이스 + 실제 Google 로그인 + 행 단위 접근권한(학생은 본인 데이터만)으로 전환됩니다.
+테이블 스키마와 보안정책은 [supabase/schema.sql](supabase/schema.sql)에 있으며,
+`js/config.js`에 URL과 anon 키만 입력하면 자동으로 원격 모드로 동작합니다.
+
+## Google 로그인 설정 (데모 모드용)
 
 `js/config.js`의 `GOOGLE_CLIENT_ID`에 Google Cloud Console에서 발급한 OAuth 클라이언트 ID를 입력하면
 실제 Google 인증(Google Identity Services)이 활성화됩니다. 비워두면 **데모 모드**로 동작하여

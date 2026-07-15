@@ -1,6 +1,7 @@
 // 앱 진입점 — 레이아웃 렌더링 및 라우팅 구성
 import { seedIfEmpty } from "./store.js";
 import { currentUser, isProfessor, logout } from "./auth.js";
+import { isRemote, initBackend, refreshCache, getInitError } from "./backend.js";
 import { route, startRouter, navigate } from "./router.js";
 import { esc } from "./utils/dom.js";
 import { renderLogin } from "./views/login.js";
@@ -38,7 +39,7 @@ const NAV = {
 
 // 로그인 필요 여부와 역할을 검사한 뒤 본문을 렌더링하는 래퍼
 function page(render, { professorOnly = false } = {}) {
-  return (params) => {
+  return async (params) => {
     const user = currentUser();
     if (!user) {
       renderLogin(app);
@@ -47,6 +48,14 @@ function page(render, { professorOnly = false } = {}) {
     if (professorOnly && user.role !== "professor") {
       navigate("#/skills");
       return;
+    }
+    // 원격 모드: 페이지 이동 시 서버 데이터를 새로 동기화
+    if (isRemote()) {
+      try {
+        await refreshCache();
+      } catch (err) {
+        console.error("데이터 동기화 실패:", err);
+      }
     }
     renderLayout(user);
     const main = app.querySelector(".main");
@@ -89,8 +98,8 @@ function renderLayout(user) {
         </footer>
       </div>
     </div>`;
-  app.querySelector("#logout-btn").addEventListener("click", () => {
-    logout();
+  app.querySelector("#logout-btn").addEventListener("click", async () => {
+    await logout();
     navigate("#/");
   });
 }
@@ -101,16 +110,30 @@ function home() {
   else navigate(isProfessor() ? "#/dashboard" : "#/skills");
 }
 
-seedIfEmpty();
+async function bootstrap() {
+  if (isRemote()) {
+    try {
+      await initBackend();
+    } catch (err) {
+      console.error("백엔드 초기화 실패:", err);
+      alert(`서버 연결에 실패했습니다. 새로고침 후 다시 시도해 주세요.\n${err.message}`);
+    }
+    const authError = getInitError();
+    if (authError) alert(authError); // 예: 미등록 Google 계정으로 로그인 시도
+  }
+  seedIfEmpty();
 
-route("#/", home);
-route("#/dashboard", page(renderDashboard, { professorOnly: true }));
-route("#/students", page(renderStudents, { professorOnly: true }));
-route("#/videos", page(renderVideos, { professorOnly: true }));
-route("#/skills", page(renderSkillList));
-route("#/skills/:id", page(renderSkillDetail));
-route("#/quiz/:id", page(renderQuiz));
-route("#/certificates", page(renderCertificates));
-route("#/certificates/print/:id", page(renderCertificatePrint));
+  route("#/", home);
+  route("#/dashboard", page(renderDashboard, { professorOnly: true }));
+  route("#/students", page(renderStudents, { professorOnly: true }));
+  route("#/videos", page(renderVideos, { professorOnly: true }));
+  route("#/skills", page(renderSkillList));
+  route("#/skills/:id", page(renderSkillDetail));
+  route("#/quiz/:id", page(renderQuiz));
+  route("#/certificates", page(renderCertificates));
+  route("#/certificates/print/:id", page(renderCertificatePrint));
 
-startRouter();
+  startRouter();
+}
+
+bootstrap();

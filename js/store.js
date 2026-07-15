@@ -1,6 +1,12 @@
-// localStorage 기반 저장소 — Repository 패턴, 불변 업데이트
+// 저장소 계층 — Repository 패턴, 불변 업데이트
+// 로컬 모드: localStorage / 원격 모드: Supabase (메모리 캐시 + write-through)
 import { SKILLS } from "./data/skills-data.js";
 import { CLASS_OPTIONS } from "./config.js";
+import {
+  isRemote, getCache,
+  pushStudent, pushDeleteStudent, pushVideo, pushProgress,
+  pushQuizResult, pushCertificate, pushDeleteCertificate,
+} from "./backend.js";
 
 const PREFIX = "cnsp.";
 const KEYS = {
@@ -34,6 +40,8 @@ function write(key, value) {
 }
 
 function uid() {
+  // 원격 모드에서는 DB uuid 컬럼과 호환되도록 UUID 사용
+  if (isRemote() && globalThis.crypto?.randomUUID) return crypto.randomUUID();
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
@@ -48,7 +56,12 @@ export function getSkill(id) {
 
 /* ===== 학생 ===== */
 export function getStudents() {
-  return read(KEYS.students, []);
+  return isRemote() ? getCache().students : read(KEYS.students, []);
+}
+
+function writeStudents(students) {
+  if (isRemote()) getCache().students = students;
+  else write(KEYS.students, students);
 }
 
 export function getStudent(id) {
@@ -81,7 +94,8 @@ export function addStudent(data) {
     email: data.email.trim(),
     createdAt: new Date().toISOString(),
   };
-  write(KEYS.students, [...getStudents(), student]);
+  writeStudents([...getStudents(), student]);
+  if (isRemote()) pushStudent(student);
   return { ok: true, student };
 }
 
@@ -94,33 +108,49 @@ export function updateStudent(id, data) {
           studentNo: data.studentNo.trim(), name: data.name.trim(), email: data.email.trim() }
       : s
   );
-  write(KEYS.students, next);
+  writeStudents(next);
+  if (isRemote()) pushStudent(next.find((s) => s.id === id));
   return { ok: true };
 }
 
 export function deleteStudent(id) {
-  write(KEYS.students, getStudents().filter((s) => s.id !== id));
-  const progress = read(KEYS.progress, {});
-  const { [id]: _removed, ...rest } = progress;
-  write(KEYS.progress, rest);
+  writeStudents(getStudents().filter((s) => s.id !== id));
+  const { [id]: _removed, ...rest } = getAllProgress();
+  writeProgress(rest);
+  // 원격 모드에서는 DB의 on delete cascade가 진도/수료증도 함께 정리
+  if (isRemote()) {
+    getCache().certificates = getCertificates().filter((c) => c.studentId !== id);
+    pushDeleteStudent(id);
+  }
 }
 
 /* ===== 영상 (skillId → { url, updatedAt }) ===== */
 export function getVideos() {
-  return read(KEYS.videos, {});
+  return isRemote() ? getCache().videos : read(KEYS.videos, {});
 }
 
 export function setVideo(skillId, url) {
   const videos = getVideos();
-  const next = url
-    ? { ...videos, [skillId]: { url, updatedAt: new Date().toISOString() } }
+  const entry = url ? { url, updatedAt: new Date().toISOString() } : null;
+  const next = entry
+    ? { ...videos, [skillId]: entry }
     : Object.fromEntries(Object.entries(videos).filter(([k]) => k !== String(skillId)));
-  write(KEYS.videos, next);
+  if (isRemote()) {
+    getCache().videos = next;
+    pushVideo(skillId, entry);
+  } else {
+    write(KEYS.videos, next);
+  }
 }
 
 /* ===== 진도 (studentId → skillId → { videoWatched, bestScore, passed }) ===== */
 export function getAllProgress() {
-  return read(KEYS.progress, {});
+  return isRemote() ? getCache().progress : read(KEYS.progress, {});
+}
+
+function writeProgress(progress) {
+  if (isRemote()) getCache().progress = progress;
+  else write(KEYS.progress, progress);
 }
 
 export function getProgress(studentId) {
@@ -131,14 +161,9 @@ export function updateProgress(studentId, skillId, patch) {
   const all = getAllProgress();
   const byStudent = all[studentId] ?? {};
   const cur = byStudent[skillId] ?? { videoWatched: false, bestScore: 0, passed: false };
-  const next = {
-    ...all,
-    [studentId]: {
-      ...byStudent,
-      [skillId]: { ...cur, ...patch, updatedAt: new Date().toISOString() },
-    },
-  };
-  write(KEYS.progress, next);
+  const merged = { ...cur, ...patch, updatedAt: new Date().toISOString() };
+  writeProgress({ ...all, [studentId]: { ...byStudent, [skillId]: merged } });
+  if (isRemote()) pushProgress(studentId, skillId, merged);
 }
 
 export function countPassed(studentId) {
@@ -147,7 +172,7 @@ export function countPassed(studentId) {
 
 /* ===== 퀴즈 결과 ===== */
 export function getQuizResults(studentId = null) {
-  const all = read(KEYS.quizResults, []);
+  const all = isRemote() ? getCache().quizResults : read(KEYS.quizResults, []);
   return studentId ? all.filter((r) => r.studentId === studentId) : all;
 }
 
@@ -158,7 +183,12 @@ export function recordQuizResult({ studentId, skillId, score, total }) {
     id: uid(), studentId, skillId, score, total,
     createdAt: new Date().toISOString(),
   };
-  write(KEYS.quizResults, [...getQuizResults(), result]);
+  if (isRemote()) {
+    getCache().quizResults = [...getQuizResults(), result];
+    pushQuizResult(result);
+  } else {
+    write(KEYS.quizResults, [...getQuizResults(), result]);
+  }
   const pct = Math.round((score / total) * 100);
   const cur = getProgress(studentId)[skillId] ?? { bestScore: 0 };
   updateProgress(studentId, skillId, {
@@ -170,7 +200,7 @@ export function recordQuizResult({ studentId, skillId, score, total }) {
 
 /* ===== 수료증 ===== */
 export function getCertificates() {
-  return read(KEYS.certificates, []);
+  return isRemote() ? getCache().certificates : read(KEYS.certificates, []);
 }
 
 export function getCertificateByStudent(studentId) {
@@ -193,12 +223,23 @@ export function issueCertificate(studentId, issuedBy) {
     passedCount: countPassed(studentId),
     issuedAt: new Date().toISOString(),
   };
-  write(KEYS.certificates, [...getCertificates(), cert]);
+  if (isRemote()) {
+    getCache().certificates = [...getCertificates(), cert];
+    pushCertificate(cert);
+  } else {
+    write(KEYS.certificates, [...getCertificates(), cert]);
+  }
   return { ok: true, cert };
 }
 
 export function revokeCertificate(certId) {
-  write(KEYS.certificates, getCertificates().filter((c) => c.id !== certId));
+  const next = getCertificates().filter((c) => c.id !== certId);
+  if (isRemote()) {
+    getCache().certificates = next;
+    pushDeleteCertificate(certId);
+  } else {
+    write(KEYS.certificates, next);
+  }
 }
 
 /* ===== 세션 ===== */
@@ -224,6 +265,7 @@ const SEED_STUDENTS = [
 ];
 
 export function seedIfEmpty() {
+  if (isRemote()) return; // 원격 모드는 supabase/schema.sql의 초기 데이터 사용
   if (!read(KEYS.seeded, false)) {
     const students = SEED_STUDENTS.map((s) => ({
       ...s, id: uid(), createdAt: new Date().toISOString(),
