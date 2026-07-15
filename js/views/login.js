@@ -124,9 +124,11 @@ export function renderLogin(root) {
             <button data-role="student" class="${role === "student" ? "active" : ""}">학생</button>
             <button data-role="professor" class="${role === "professor" ? "active" : ""}">교수</button>
           </div>
-          ${role === "student" ? `
+          ${role === "student" || isRemote() ? `
             <p class="muted" style="text-align:center;margin-bottom:14px">
-              학교에 등록된 Google 계정으로 로그인하세요.
+              ${role === "student"
+                ? "학교에 등록된 Google 계정으로 로그인하세요."
+                : "교수 허용 목록에 등록된 Google 계정으로 로그인하세요."}
             </p>
             <button type="button" class="btn btn-google" id="google-btn">
               ${GOOGLE_ICON} Google 계정으로 로그인
