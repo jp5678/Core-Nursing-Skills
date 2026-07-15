@@ -67,7 +67,7 @@ function renderLayout(user) {
     <div class="layout">
       <aside class="sidebar no-print">
         <div class="brand">
-          <div class="univ">CHEONGAM UNIVERSITY</div>
+          <div class="univ">CHEONGAM UNIVERSITY · DEPT. OF NURSING</div>
           <div class="title">청암대학교 간호학과<br/>핵심기본간호술 교육 플랫폼</div>
         </div>
         <nav>

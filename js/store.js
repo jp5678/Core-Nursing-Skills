@@ -11,6 +11,7 @@ const KEYS = {
   certificates: `${PREFIX}certificates`,
   session: `${PREFIX}session`,
   seeded: `${PREFIX}seeded.v1`,
+  demoUpgraded: `${PREFIX}migration.demoFullCompletion`,
 };
 
 function read(key, fallback) {
@@ -223,26 +224,49 @@ const SEED_STUDENTS = [
 ];
 
 export function seedIfEmpty() {
-  if (read(KEYS.seeded, false)) return;
-  const students = SEED_STUDENTS.map((s) => ({
-    ...s, id: uid(), createdAt: new Date().toISOString(),
-  }));
-  write(KEYS.students, students);
+  if (!read(KEYS.seeded, false)) {
+    const students = SEED_STUDENTS.map((s) => ({
+      ...s, id: uid(), createdAt: new Date().toISOString(),
+    }));
+    write(KEYS.students, students);
 
-  // 데모용 진도: 첫 번째 학생(김하은)은 대부분 이수, 두 번째는 일부 진행
-  const [first, second] = students;
-  const progress = {};
-  progress[first.id] = {};
-  for (let skillId = 1; skillId <= 18; skillId++) {
-    progress[first.id][skillId] = {
-      videoWatched: true, bestScore: 80 + (skillId % 3) * 10, passed: true,
-      updatedAt: new Date().toISOString(),
+    // 데모용 진도: 첫 번째 학생(김하은)은 전 항목 이수, 두 번째는 일부 진행
+    const [first, second] = students;
+    const progress = {};
+    progress[first.id] = {};
+    for (const skill of SKILLS) {
+      progress[first.id][skill.id] = {
+        videoWatched: true, bestScore: 80 + (skill.id % 3) * 10, passed: true,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    progress[second.id] = {
+      1: { videoWatched: true, bestScore: 100, passed: true, updatedAt: new Date().toISOString() },
+      2: { videoWatched: true, bestScore: 60, passed: false, updatedAt: new Date().toISOString() },
     };
+    write(KEYS.progress, progress);
+    write(KEYS.seeded, true);
   }
-  progress[second.id] = {
-    1: { videoWatched: true, bestScore: 100, passed: true, updatedAt: new Date().toISOString() },
-    2: { videoWatched: true, bestScore: 60, passed: false, updatedAt: new Date().toISOString() },
-  };
-  write(KEYS.progress, progress);
-  write(KEYS.seeded, true);
+  upgradeDemoStudent();
+}
+
+// 데모 학생(학번 20240101)을 전 항목 이수 + 수료증 발급 상태로 승격
+// (구버전 시드로 만들어진 기존 브라우저 데이터도 한 번만 업그레이드)
+function upgradeDemoStudent() {
+  if (read(KEYS.demoUpgraded, false)) return;
+  const demo = getStudents().find((s) => s.studentNo === "20240101");
+  if (demo) {
+    for (const skill of SKILLS) {
+      const cur = getProgress(demo.id)[skill.id] ?? {};
+      updateProgress(demo.id, skill.id, {
+        videoWatched: true,
+        bestScore: Math.max(cur.bestScore ?? 0, 80 + (skill.id % 3) * 10),
+        passed: true,
+      });
+    }
+    if (!getCertificateByStudent(demo.id)) {
+      issueCertificate(demo.id, "간호학과 교수");
+    }
+  }
+  write(KEYS.demoUpgraded, true);
 }
