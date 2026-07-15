@@ -37,7 +37,7 @@ export function renderQuiz(main, params, user) {
           <label class="quiz-opt ${cls}">
             <input type="radio" name="q${qi}" value="${oi}"
               ${answers[qi] === oi ? "checked" : ""} ${submitted ? "disabled" : ""} />
-            <span>${["①", "②", "③", "④"][oi]} ${esc(opt)}</span>
+            <span>${["①", "②", "③", "④", "⑤"][oi]} ${esc(opt)}</span>
           </label>`;
         }).join("")}
         ${submitted ? `<div class="muted" style="margin-top:4px">💡 ${esc(q.explanation)}</div>` : ""}

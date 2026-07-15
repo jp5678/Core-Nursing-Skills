@@ -9,21 +9,29 @@ import { renderStudents } from "./views/students.js";
 import { renderVideos } from "./views/videos.js";
 import { renderSkillList } from "./views/skill-list.js";
 import { renderSkillDetail } from "./views/skill-detail.js";
-import { renderQuiz } from "./views/quiz.js";
+import { renderQuiz } from "./views/quiz.js?v=2";
 import { renderCertificates, renderCertificatePrint } from "./views/certificates.js";
 
 const app = document.getElementById("app");
+
+// 어두운 사이드바에서도 잘 보이도록 밝은 색 SVG 청진기 아이콘 사용
+const STETHOSCOPE_ICON = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+  stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+  <path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/>
+  <circle cx="20" cy="10" r="2"/>
+</svg>`;
 
 const NAV = {
   professor: [
     { hash: "#/dashboard", icon: "📊", label: "대시보드" },
     { hash: "#/students", icon: "👥", label: "학생 관리" },
-    { hash: "#/skills", icon: "🩺", label: "술기 목록" },
+    { hash: "#/skills", icon: STETHOSCOPE_ICON, label: "술기 목록" },
     { hash: "#/videos", icon: "🎬", label: "영상 관리" },
     { hash: "#/certificates", icon: "📜", label: "수료증 관리" },
   ],
   student: [
-    { hash: "#/skills", icon: "🩺", label: "술기 학습" },
+    { hash: "#/skills", icon: STETHOSCOPE_ICON, label: "술기 학습" },
     { hash: "#/certificates", icon: "📜", label: "내 수료증" },
   ],
 };

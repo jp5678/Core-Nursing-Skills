@@ -2,6 +2,7 @@
 import { getSkills } from "../store.js";
 
 const QUESTIONS_PER_QUIZ = 5;
+const WRONG_OPTIONS_PER_QUESTION = 4; // 정답 1 + 오답 4 = 5지 선다
 
 function shuffle(arr) {
   const copy = [...arr];
@@ -51,7 +52,7 @@ function orderQuestion(skill) {
     .join("\n");
   const correctOrder = window.map((s) => labels[shuffled.indexOf(s)]).join(" → ");
   const wrongOrders = new Set();
-  while (wrongOrders.size < 3) {
+  while (wrongOrders.size < WRONG_OPTIONS_PER_QUESTION) {
     const cand = shuffle(labels).join(" → ");
     if (cand !== correctOrder) wrongOrders.add(cand);
   }
@@ -65,7 +66,7 @@ function orderQuestion(skill) {
 
 /* 유형 2 — 필요 물품이 아닌 것: 타 술기의 물품을 오답으로 */
 function equipmentQuestion(skill, allSkills) {
-  if (skill.equipment.length < 3) return null;
+  if (skill.equipment.length < WRONG_OPTIONS_PER_QUESTION) return null;
   const own = new Set(skill.equipment);
   const foreign = allSkills
     .filter((s) => s.id !== skill.id)
@@ -73,7 +74,7 @@ function equipmentQuestion(skill, allSkills) {
     .filter((e) => !own.has(e) && ![...own].some((o) => o.includes(e) || e.includes(o)));
   if (!foreign.length) return null;
   const intruder = truncate(pick(foreign, 1)[0], 60);
-  const owns = pickDistinct(skill.equipment.map((e) => truncate(e, 60)), 3, [intruder]);
+  const owns = pickDistinct(skill.equipment.map((e) => truncate(e, 60)), WRONG_OPTIONS_PER_QUESTION, [intruder]);
   if (!owns) return null;
   return makeQuestion(
     `[필요 물품] 다음 중 「${skill.name}」의 필요장비 및 물품이 아닌 것은?`,
@@ -87,13 +88,13 @@ function equipmentQuestion(skill, allSkills) {
 function criticalStepQuestion(skill) {
   const criticals = skill.steps.filter((s) => s.critical);
   const normals = skill.steps.filter((s) => !s.critical);
-  if (!criticals.length || normals.length < 3) return null;
+  if (!criticals.length || normals.length < WRONG_OPTIONS_PER_QUESTION) return null;
   const correct = pick(criticals, 1)[0];
   const correctText = truncate(correct.text);
   const criticalTexts = criticals.map((s) => truncate(s.text));
   const wrongs = pickDistinct(
     normals.map((s) => truncate(s.text)).filter((t) => !criticalTexts.includes(t)),
-    3, [correctText]
+    WRONG_OPTIONS_PER_QUESTION, [correctText]
   );
   if (!wrongs) return null;
   return makeQuestion(
@@ -106,9 +107,9 @@ function criticalStepQuestion(skill) {
 
 /* 유형 4 — 첫 수행 단계 */
 function firstStepQuestion(skill) {
-  if (skill.steps.length < 5) return null;
+  if (skill.steps.length < 6) return null;
   const firstText = truncate(skill.steps[0].text);
-  const later = pickDistinct(skill.steps.slice(2).map((s) => truncate(s.text)), 3, [firstText]);
+  const later = pickDistinct(skill.steps.slice(2).map((s) => truncate(s.text)), WRONG_OPTIONS_PER_QUESTION, [firstText]);
   if (!later) return null;
   return makeQuestion(
     `[우선 순위] 「${skill.name}」 수행 시 가장 먼저 해야 하는 것은?`,
@@ -126,9 +127,9 @@ function objectiveQuestion(skill, allSkills) {
     .filter((s) => s.id !== skill.id)
     .flatMap((s) => s.objectives)
     .filter((o) => !own.has(o));
-  if (foreign.length < 3) return null;
+  if (foreign.length < WRONG_OPTIONS_PER_QUESTION) return null;
   const correct = truncate(pick(skill.objectives, 1)[0]);
-  const wrongs = pickDistinct(foreign.map((o) => truncate(o)), 3, [correct]);
+  const wrongs = pickDistinct(foreign.map((o) => truncate(o)), WRONG_OPTIONS_PER_QUESTION, [correct]);
   if (!wrongs) return null;
   return makeQuestion(
     `[성취 목표] 다음 중 「${skill.name}」의 성취목표에 해당하는 것은?`,
