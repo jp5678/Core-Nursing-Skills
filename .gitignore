@@ -1,0 +1,10 @@
+# 원본 PDF — 한국간호교육평가원 저작물(무단 복제·배포 금지)이므로 저장소에 포함하지 않음
+*.pdf
+
+# macOS
+.DS_Store
+
+# 로컬 도구 설정
+.claude/
+docs/.pdca-status.json
+docs/.bkit-memory.json
