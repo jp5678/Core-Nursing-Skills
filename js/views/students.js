@@ -9,12 +9,20 @@ export function renderStudents(main) {
   let gradeFilter = "";
 
   function filtered() {
-    return getStudents().filter((s) => {
-      if (gradeFilter && String(s.grade) !== gradeFilter) return false;
-      if (!keyword) return true;
-      const k = keyword.toLowerCase();
-      return [s.name, s.studentNo, s.email, s.classNo].some((v) => String(v).toLowerCase().includes(k));
-    });
+    return getStudents()
+      .filter((s) => {
+        if (gradeFilter && String(s.grade) !== gradeFilter) return false;
+        if (!keyword) return true;
+        const k = keyword.toLowerCase();
+        return [s.name, s.studentNo, s.email, s.classNo].some((v) => String(v).toLowerCase().includes(k));
+      })
+      .sort(
+        (a, b) =>
+          a.grade - b.grade ||
+          a.classNo.localeCompare(b.classNo, "ko") ||
+          a.studentNo.localeCompare(b.studentNo, "ko", { numeric: true }) ||
+          a.name.localeCompare(b.name, "ko")
+      );
   }
 
   function draw() {
