@@ -142,10 +142,14 @@ export function renderLogin(root) {
               <button type="submit" class="btn btn-primary">로그인</button>
             </form>
           `}
-          ${isRemote() ? "" : `
+          ${role === "student" ? (isRemote() ? "" : `
           <div class="demo-hint">
             <strong>데모 계정</strong><br/>
-            학생: 학번 20240101 / haeun.kim@scjc.ac.kr
+            학생: haeun.kim@scjc.ac.kr
+          </div>`) : `
+          <div class="demo-hint">
+            <strong>문의</strong><br/>
+            정종필 교수 · imjp5678@scjc.ac.kr
           </div>`}
         </div>
         <footer class="site-footer on-dark">
