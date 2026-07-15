@@ -35,10 +35,32 @@ export function getInitError() {
   return err;
 }
 
+// OAuth 복귀 URL에 담긴 인증 오류(#error=... / ?error=...)를 추출
+function readAuthErrorFromUrl() {
+  const fromHash = new URLSearchParams(location.hash.replace(/^#\/?/, ""));
+  const fromQuery = new URLSearchParams(location.search);
+  const desc = fromHash.get("error_description") ?? fromQuery.get("error_description");
+  const code = fromHash.get("error") ?? fromQuery.get("error");
+  if (!desc && !code) return null;
+  return `Google 로그인 처리 중 오류가 발생했습니다: ${desc ?? code}`;
+}
+
 export async function initBackend() {
   if (!isRemote()) return;
+  const urlError = readAuthErrorFromUrl();
+  if (urlError) {
+    initError = urlError;
+    history.replaceState(null, "", location.pathname);
+  }
   const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
   const { data: { session } } = await client.auth.getSession();
   if (!session) return;
   try {

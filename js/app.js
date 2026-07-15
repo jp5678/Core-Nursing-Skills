@@ -113,13 +113,19 @@ function home() {
 async function bootstrap() {
   if (isRemote()) {
     try {
-      await initBackend();
+      // 어떤 경우에도 '불러오는 중' 화면에서 무한 대기하지 않도록 시간 제한
+      await Promise.race([
+        initBackend(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("서버 응답이 없습니다 (20초 초과). 네트워크를 확인해 주세요.")), 20000)
+        ),
+      ]);
     } catch (err) {
       console.error("백엔드 초기화 실패:", err);
       alert(`서버 연결에 실패했습니다. 새로고침 후 다시 시도해 주세요.\n${err.message}`);
     }
     const authError = getInitError();
-    if (authError) alert(authError); // 예: 미등록 Google 계정으로 로그인 시도
+    if (authError) alert(authError); // 예: 미등록 Google 계정, OAuth 복귀 오류
   }
   seedIfEmpty();
 
