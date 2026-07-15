@@ -10,10 +10,7 @@ export function renderQuiz(main, params, user) {
     main.innerHTML = `<div class="card empty-state">술기 항목을 찾을 수 없습니다.</div>`;
     return;
   }
-  if (user.role !== "student") {
-    // 교수는 미리보기 모드로 응시 가능 (기록되지 않음)
-  }
-
+  // 교수는 미리보기 모드로 응시 가능 (결과가 기록되지 않음)
   const questions = generateQuiz(skill);
   const answers = new Array(questions.length).fill(null);
   let submitted = false;

@@ -118,10 +118,15 @@ export function deleteStudent(id) {
   writeStudents(getStudents().filter((s) => s.id !== id));
   const { [id]: _removed, ...rest } = getAllProgress();
   writeProgress(rest);
-  // 원격 모드에서는 DB의 on delete cascade가 진도/수료증도 함께 정리
+  const certificates = getCertificates().filter((c) => c.studentId !== id);
+  const quizResults = getQuizResults().filter((r) => r.studentId !== id);
   if (isRemote()) {
-    getCache().certificates = getCertificates().filter((c) => c.studentId !== id);
-    pushDeleteStudent(id);
+    getCache().certificates = certificates;
+    getCache().quizResults = quizResults;
+    pushDeleteStudent(id); // DB 쪽은 on delete cascade가 진도/퀴즈/수료증을 함께 정리
+  } else {
+    write(KEYS.certificates, certificates);
+    write(KEYS.quizResults, quizResults);
   }
 }
 

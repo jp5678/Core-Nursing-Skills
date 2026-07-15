@@ -20,8 +20,8 @@ python3 -m http.server 4173
 
 | 역할 | 로그인 정보 |
 |------|-------------|
-| 교수 | 비공개 (`js/auth.js`의 `PROFESSOR` 상수 참조) |
-| 학생 | Google 계정 로그인 전용 — 데모 모드에서는 등록된 이메일 입력 (예: `haeun.kim@scjc.ac.kr`) |
+| 교수 | 원격 모드: Google 로그인(professors 테이블 등록 계정) / 로컬 데모: `js/auth.js`의 `DEMO_PROFESSOR` 참조 |
+| 학생 | Google 계정 로그인 전용 — 로컬 데모 모드에서는 등록된 이메일 입력 (예: `s001@scjc.ac.kr`) |
 
 ## 주요 기능
 
@@ -66,13 +66,6 @@ docs/design.md      설계 문서
 공유 데이터베이스 + 실제 Google 로그인 + 행 단위 접근권한(학생은 본인 데이터만)으로 전환됩니다.
 테이블 스키마와 보안정책은 [supabase/schema.sql](supabase/schema.sql)에 있으며,
 `js/config.js`에 URL과 anon 키만 입력하면 자동으로 원격 모드로 동작합니다.
-
-## Google 로그인 설정 (데모 모드용)
-
-`js/config.js`의 `GOOGLE_CLIENT_ID`에 Google Cloud Console에서 발급한 OAuth 클라이언트 ID를 입력하면
-실제 Google 인증(Google Identity Services)이 활성화됩니다. 비워두면 **데모 모드**로 동작하여
-등록된 학교 이메일 입력으로 로그인을 시뮬레이션합니다. 어느 모드든 교수가 등록한 학생 이메일과
-일치해야 로그인됩니다.
 
 ## 운영 배포 시 유의사항 (현재는 데모)
 

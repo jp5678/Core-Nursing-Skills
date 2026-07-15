@@ -190,22 +190,6 @@ export function pushDeleteCertificate(id) {
 
 // ---------- 인증 ----------
 
-export async function signInProfessor(email, password) {
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
-  try {
-    await buildAuthContext(data.user.email);
-  } catch (err) {
-    await client.auth.signOut();
-    return { ok: false, error: err.message };
-  }
-  if (authContext.role !== "professor") {
-    await signOutRemote();
-    return { ok: false, error: "교수 권한이 없는 계정입니다." };
-  }
-  return { ok: true, session: authContext };
-}
-
 export async function signInWithGoogle() {
   const redirectTo = location.origin + location.pathname;
   const { error } = await client.auth.signInWithOAuth({

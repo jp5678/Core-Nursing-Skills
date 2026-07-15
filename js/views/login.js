@@ -1,60 +1,28 @@
-// 로그인 화면 — 학생: Google 계정 전용, 교수: 이메일/비밀번호
+// 로그인 화면 — 원격 모드: 학생·교수 모두 Google 계정(Supabase OAuth)
+//              로컬 데모 모드: 학생 데모 모달, 교수 이메일/비밀번호
 import { loginProfessor, loginStudentByEmail, loginStudentWithGoogle } from "../auth.js";
 import { navigate } from "../router.js";
 import { esc, el } from "../utils/dom.js";
-import { GOOGLE_CLIENT_ID } from "../config.js";
 import { isRemote } from "../backend.js";
 
 const GOOGLE_ICON = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.2 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.2 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.4 44 30.2 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>`;
 
-function loadGsiScript() {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.id) { resolve(); return; }
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Google 로그인 스크립트를 불러오지 못했습니다."));
-    document.head.appendChild(script);
-  });
-}
-
-function decodeJwtEmail(credential) {
-  try {
-    const payload = credential.split(".")[1].replaceAll("-", "+").replaceAll("_", "/");
-    const json = decodeURIComponent(
-      atob(payload).split("").map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join("")
-    );
-    return JSON.parse(json).email ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function renderLogin(root) {
   let role = "student";
 
-  function finishStudentLogin(result, errorEl) {
-    if (!result.ok) {
-      errorEl.textContent = result.error;
-      return;
-    }
-    navigate("#/skills");
-  }
-
-  // 데모 모드: 등록된 학교 이메일 입력으로 Google 로그인 시뮬레이션
+  // 로컬 데모 모드: 등록된 학교 이메일 입력으로 Google 로그인 시뮬레이션
   function openDemoGoogleModal() {
     const modal = el(`
       <div class="modal-back">
         <div class="modal" style="width:420px">
           <h2>${GOOGLE_ICON} Google 계정으로 로그인</h2>
           <p class="muted" style="margin-bottom:12px">
-            데모 모드입니다. 실제 Google 인증을 사용하려면 <code>js/config.js</code>에
-            OAuth 클라이언트 ID를 설정하세요.<br/>등록된 Google(학교) 이메일을 입력하면 로그인됩니다.
+            데모 모드입니다 (Supabase 연동 시 실제 Google 인증이 활성화됩니다).<br/>
+            등록된 학교 이메일을 입력하면 로그인됩니다.
           </p>
           <form id="google-demo-form">
             <div class="field"><label>Google 이메일</label>
-              <input name="email" type="email" placeholder="haeun.kim@scjc.ac.kr" required /></div>
+              <input name="email" type="email" placeholder="s001@scjc.ac.kr" required /></div>
             <div class="form-error" id="google-demo-error"></div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">로그인</button>
@@ -80,38 +48,13 @@ export function renderLogin(root) {
   }
 
   async function handleGoogleLogin(errorEl) {
-    // 원격 모드(Supabase): 실제 Google OAuth로 리디렉션
-    if (isRemote()) {
-      const result = await loginStudentWithGoogle();
-      if (!result.ok) errorEl.textContent = result.error ?? "Google 로그인에 실패했습니다.";
-      return;
-    }
-    if (!GOOGLE_CLIENT_ID) {
+    if (!isRemote()) {
       openDemoGoogleModal();
       return;
     }
-    try {
-      await loadGsiScript();
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response) => {
-          const email = decodeJwtEmail(response.credential);
-          if (!email) {
-            errorEl.textContent = "Google 계정 정보를 확인하지 못했습니다.";
-            return;
-          }
-          finishStudentLogin(loginStudentByEmail(email), errorEl);
-        },
-      });
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-          errorEl.textContent = "Google 로그인 창을 열 수 없습니다. 팝업 차단 여부를 확인하세요.";
-        }
-      });
-    } catch (err) {
-      console.error("Google 로그인 오류:", err);
-      errorEl.textContent = err.message;
-    }
+    // 원격 모드: Supabase를 통해 Google OAuth로 리디렉션
+    const result = await loginStudentWithGoogle();
+    if (!result.ok) errorEl.textContent = result.error ?? "Google 로그인에 실패했습니다.";
   }
 
   function draw() {
