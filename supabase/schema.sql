@@ -75,47 +75,60 @@ alter table public.quiz_results  enable row level security;
 alter table public.certificates  enable row level security;
 
 -- professors: 로그인한 사용자는 조회만 가능(권한 판별용), 수정은 대시보드에서
+drop policy if exists professors_select on public.professors;
 create policy professors_select on public.professors
   for select to authenticated using (true);
 
 -- students: 조회는 로그인 사용자 전체, 등록/수정/삭제는 교수만
+drop policy if exists students_select on public.students;
 create policy students_select on public.students
   for select to authenticated using (true);
+drop policy if exists students_write on public.students;
 create policy students_write on public.students
   for all to authenticated using (is_professor()) with check (is_professor());
 
 -- videos: 조회는 로그인 사용자, 등록/삭제는 교수만
+drop policy if exists videos_select on public.videos;
 create policy videos_select on public.videos
   for select to authenticated using (true);
+drop policy if exists videos_write on public.videos;
 create policy videos_write on public.videos
   for all to authenticated using (is_professor()) with check (is_professor());
 
 -- progress: 학생은 본인 것만 읽고 쓰기, 교수는 전체
+drop policy if exists progress_select on public.progress;
 create policy progress_select on public.progress
   for select to authenticated
   using (is_professor() or student_id = current_student_id());
+drop policy if exists progress_upsert on public.progress;
 create policy progress_upsert on public.progress
   for insert to authenticated
   with check (is_professor() or student_id = current_student_id());
+drop policy if exists progress_update on public.progress;
 create policy progress_update on public.progress
   for update to authenticated
   using (is_professor() or student_id = current_student_id())
   with check (is_professor() or student_id = current_student_id());
+drop policy if exists progress_delete on public.progress;
 create policy progress_delete on public.progress
   for delete to authenticated using (is_professor());
 
 -- quiz_results: 학생은 본인 기록 생성/조회, 교수는 전체 조회
+drop policy if exists quiz_select on public.quiz_results;
 create policy quiz_select on public.quiz_results
   for select to authenticated
   using (is_professor() or student_id = current_student_id());
+drop policy if exists quiz_insert on public.quiz_results;
 create policy quiz_insert on public.quiz_results
   for insert to authenticated
   with check (is_professor() or student_id = current_student_id());
 
 -- certificates: 학생은 본인 것 조회, 발급/취소는 교수만
+drop policy if exists cert_select on public.certificates;
 create policy cert_select on public.certificates
   for select to authenticated
   using (is_professor() or student_id = current_student_id());
+drop policy if exists cert_write on public.certificates;
 create policy cert_write on public.certificates
   for all to authenticated using (is_professor()) with check (is_professor());
 
