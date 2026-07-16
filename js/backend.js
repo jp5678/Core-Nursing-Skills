@@ -89,8 +89,9 @@ export async function initBackend() {
 
 // 로그인한 이메일이 교수 목록 또는 학생 명단에 있는지 확인해 역할을 결정
 async function buildAuthContext(email) {
+  // select("*"): is_admin 컬럼이 아직 없는(마이그레이션 전) DB에서도 동작
   const { data: prof, error: profErr } = await client
-    .from("professors").select("email, name, is_admin").eq("email", email).maybeSingle();
+    .from("professors").select("*").eq("email", email).maybeSingle();
   if (profErr) throw new Error(`권한 확인 실패: ${profErr.message}`);
   if (prof) {
     authContext = { role: "professor", name: prof.name, email, isAdmin: Boolean(prof.is_admin) };
