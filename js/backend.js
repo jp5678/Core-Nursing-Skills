@@ -69,7 +69,11 @@ export async function initBackend() {
     },
   });
   const { data: { session } } = await client.auth.getSession();
-  if (!session) return;
+  if (!session) {
+    // 로그인 시도 후 취소한 경우 남아 있는 의도 표시 제거
+    sessionStorage.removeItem("cnsp.intendedRole");
+    return;
+  }
   try {
     await buildAuthContext(session.user.email);
     // 교수 탭에서 로그인했는데 교수 허용 목록에 없는 계정이면 거부

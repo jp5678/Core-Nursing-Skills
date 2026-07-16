@@ -78,13 +78,19 @@ export function validateStudent(data, { excludeId = null } = {}) {
   const errors = [];
   if (!data.name?.trim()) errors.push("성명을 입력해 주세요.");
   if (!/^\d{4,10}$/.test(data.studentNo ?? "")) errors.push("학번은 4~10자리 숫자여야 합니다.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email ?? "")) errors.push("올바른 이메일을 입력해 주세요.");
+  const email = data.email?.trim().toLowerCase() ?? "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("올바른 이메일을 입력해 주세요.");
   const grade = Number(data.grade);
   if (!Number.isInteger(grade) || grade < 1 || grade > 4) errors.push("학년은 1~4 사이여야 합니다.");
   const classNo = data.classNo?.toString().trim().toUpperCase();
   if (!CLASS_OPTIONS.includes(classNo)) errors.push(`반은 ${CLASS_OPTIONS.join(", ")} 중 하나여야 합니다.`);
   const dup = getStudents().find((s) => s.studentNo === data.studentNo && s.id !== excludeId);
   if (dup) errors.push(`학번 ${data.studentNo}은(는) 이미 등록되어 있습니다 (${dup.name}).`);
+  const dupEmail = getStudents().find((s) => s.email.toLowerCase() === email && s.id !== excludeId);
+  if (dupEmail) errors.push(`이메일 ${email}은(는) 이미 등록되어 있습니다 (${dupEmail.name}).`);
+  if (getProfessors().some((p) => p.email === email)) {
+    errors.push("교수 허용 목록에 있는 이메일은 학생으로 등록할 수 없습니다.");
+  }
   return errors;
 }
 
