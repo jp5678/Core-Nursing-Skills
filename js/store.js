@@ -4,7 +4,8 @@ import { SKILLS } from "./data/skills-data.js";
 import { CLASS_OPTIONS } from "./config.js";
 import {
   isRemote, getCache,
-  pushStudent, pushDeleteStudent, pushVideoInsert, pushVideoDelete, pushProgress,
+  pushStudent, pushDeleteStudent, pushProfessor, pushDeleteProfessor,
+  pushVideoInsert, pushVideoDelete, pushProgress,
   pushQuizResult, pushCertificate, pushDeleteCertificate,
   pushAssignment, pushDeleteAssignment, pushSubmission,
 } from "./backend.js";
@@ -18,6 +19,7 @@ const KEYS = {
   certificates: `${PREFIX}certificates`,
   assignments: `${PREFIX}assignments`,
   submissions: `${PREFIX}submissions`,
+  professors: `${PREFIX}professors`,
   session: `${PREFIX}session`,
   seeded: `${PREFIX}seeded.v1`,
   demoUpgraded: `${PREFIX}migration.demoFullCompletion`,
@@ -131,6 +133,52 @@ export function deleteStudent(id) {
     write(KEYS.certificates, certificates);
     write(KEYS.quizResults, quizResults);
   }
+}
+
+/* ===== 교수 허용 목록 (관리자 전용 관리) ===== */
+const LOCAL_ADMIN = { email: "imjp5678@scjc.ac.kr", name: "정종필 교수", isAdmin: true };
+
+export function getProfessors() {
+  return isRemote() ? getCache().professors : read(KEYS.professors, [LOCAL_ADMIN]);
+}
+
+function writeProfessors(list) {
+  if (isRemote()) getCache().professors = list;
+  else write(KEYS.professors, list);
+}
+
+export function addProfessor(data) {
+  const errors = [];
+  const email = data.email?.trim().toLowerCase() ?? "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("올바른 이메일을 입력해 주세요.");
+  if (!data.name?.trim()) errors.push("이름을 입력해 주세요.");
+  if (getProfessors().some((p) => p.email === email)) errors.push(`${email}은(는) 이미 등록되어 있습니다.`);
+  if (getStudents().some((s) => s.email.toLowerCase() === email)) {
+    errors.push("학생 명단에 있는 이메일입니다. 학생 계정을 먼저 삭제하세요.");
+  }
+  if (errors.length) return { ok: false, errors };
+  const professor = { email, name: data.name.trim(), isAdmin: false };
+  writeProfessors([...getProfessors(), professor]);
+  if (isRemote()) pushProfessor(professor);
+  return { ok: true, professor };
+}
+
+export function updateProfessorName(email, name) {
+  if (!name?.trim()) return { ok: false, errors: ["이름을 입력해 주세요."] };
+  const next = getProfessors().map((p) => (p.email === email ? { ...p, name: name.trim() } : p));
+  writeProfessors(next);
+  if (isRemote()) pushProfessor(next.find((p) => p.email === email));
+  return { ok: true };
+}
+
+export function deleteProfessor(email, currentUserEmail) {
+  const target = getProfessors().find((p) => p.email === email);
+  if (!target) return { ok: false, errors: ["대상을 찾을 수 없습니다."] };
+  if (target.isAdmin) return { ok: false, errors: ["관리자 계정은 삭제할 수 없습니다."] };
+  if (email === currentUserEmail?.toLowerCase()) return { ok: false, errors: ["본인 계정은 삭제할 수 없습니다."] };
+  writeProfessors(getProfessors().filter((p) => p.email !== email));
+  if (isRemote()) pushDeleteProfessor(email);
+  return { ok: true };
 }
 
 /* ===== 영상 (skillId → [ { id, url, updatedAt }, ... ]) ===== */

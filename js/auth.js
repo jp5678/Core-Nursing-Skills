@@ -24,7 +24,8 @@ export async function loginProfessor(email, password) {
   if (email.trim().toLowerCase() !== DEMO_PROFESSOR.email || password !== DEMO_PROFESSOR.password) {
     return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
   }
-  const session = { role: "professor", name: DEMO_PROFESSOR.name, email: DEMO_PROFESSOR.email };
+  // 로컬 데모에서는 관리자 기능도 시연 가능하도록 isAdmin 부여
+  const session = { role: "professor", name: DEMO_PROFESSOR.name, email: DEMO_PROFESSOR.email, isAdmin: true };
   setSession(session);
   return { ok: true, session };
 }

@@ -52,6 +52,8 @@ export function renderLogin(root) {
       openDemoGoogleModal();
       return;
     }
+    // 선택한 탭을 기억해 두고, 복귀 후 역할 검증에 사용 (교수 탭인데 교수 목록에 없으면 거부)
+    sessionStorage.setItem("cnsp.intendedRole", role);
     // 원격 모드: Supabase를 통해 Google OAuth로 리디렉션
     const result = await loginStudentWithGoogle();
     if (!result.ok) errorEl.textContent = result.error ?? "Google 로그인에 실패했습니다.";

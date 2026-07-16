@@ -5,10 +5,11 @@
 
 -- ---------- 테이블 ----------
 
--- 교수 허용 목록 (이 이메일로 로그인하면 교수 권한)
+-- 교수 허용 목록 (이 이메일로 로그인하면 교수 권한, is_admin이면 교수 관리 가능)
 create table if not exists public.professors (
-  email text primary key,
-  name  text not null default '간호학과 교수'
+  email    text primary key,
+  name     text not null default '간호학과 교수',
+  is_admin boolean not null default false
 );
 
 create table if not exists public.students (
@@ -81,6 +82,10 @@ create or replace function public.is_professor()
 returns boolean language sql stable security definer set search_path = public as
 $$ select exists (select 1 from professors p where p.email = auth.jwt()->>'email') $$;
 
+create or replace function public.is_admin()
+returns boolean language sql stable security definer set search_path = public as
+$$ select exists (select 1 from professors p where p.email = auth.jwt()->>'email' and p.is_admin) $$;
+
 create or replace function public.current_student_id()
 returns uuid language sql stable security definer set search_path = public as
 $$ select s.id from students s where s.email = auth.jwt()->>'email' $$;
@@ -94,10 +99,13 @@ alter table public.progress      enable row level security;
 alter table public.quiz_results  enable row level security;
 alter table public.certificates  enable row level security;
 
--- professors: 로그인한 사용자는 조회만 가능(권한 판별용), 수정은 대시보드에서
+-- professors: 조회는 로그인 사용자(권한 판별용), 등록/수정/삭제는 관리자만
 drop policy if exists professors_select on public.professors;
 create policy professors_select on public.professors
   for select to authenticated using (true);
+drop policy if exists professors_write on public.professors;
+create policy professors_write on public.professors
+  for all to authenticated using (is_admin()) with check (is_admin());
 
 -- students: 조회는 로그인 사용자 전체, 등록/수정/삭제는 교수만
 drop policy if exists students_select on public.students;
@@ -182,10 +190,10 @@ create policy cert_write on public.certificates
 
 -- ---------- 초기 데이터 ----------
 
--- 교수 허용 목록 (필요에 따라 추가/삭제하세요)
-insert into public.professors (email, name) values
-  ('imjp5678@scjc.ac.kr', '정종필 교수'),
-  ('jp5678@gmail.com',    '정종필 교수')
+-- 교수 허용 목록 (관리자는 앱의 '교수 관리' 메뉴에서 추가/삭제 가능)
+insert into public.professors (email, name, is_admin) values
+  ('imjp5678@scjc.ac.kr', '정종필 교수', true),
+  ('jp5678@gmail.com',    '정종필 교수', false)
 on conflict (email) do nothing;
 
 -- 데모 학생 (원치 않으면 이 블록을 지우고 실행하세요)

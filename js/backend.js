@@ -10,6 +10,7 @@ let initError = null;
 
 const cache = {
   students: [],
+  professors: [],
   videos: {},        // skillId → [ { id, url, updatedAt }, ... ]
   progress: {},
   quizResults: [],
@@ -71,6 +72,14 @@ export async function initBackend() {
   if (!session) return;
   try {
     await buildAuthContext(session.user.email);
+    // 교수 탭에서 로그인했는데 교수 허용 목록에 없는 계정이면 거부
+    const intended = sessionStorage.getItem("cnsp.intendedRole");
+    sessionStorage.removeItem("cnsp.intendedRole");
+    if (intended === "professor" && authContext?.role !== "professor") {
+      throw new Error(
+        `${session.user.email} 계정은 교수 허용 목록에 등록되어 있지 않습니다. 관리자(정종필 교수)에게 등록을 요청하세요.`
+      );
+    }
   } catch (err) {
     initError = err.message;
     authContext = null;
@@ -81,10 +90,10 @@ export async function initBackend() {
 // 로그인한 이메일이 교수 목록 또는 학생 명단에 있는지 확인해 역할을 결정
 async function buildAuthContext(email) {
   const { data: prof, error: profErr } = await client
-    .from("professors").select("email, name").eq("email", email).maybeSingle();
+    .from("professors").select("email, name, is_admin").eq("email", email).maybeSingle();
   if (profErr) throw new Error(`권한 확인 실패: ${profErr.message}`);
   if (prof) {
-    authContext = { role: "professor", name: prof.name, email };
+    authContext = { role: "professor", name: prof.name, email, isAdmin: Boolean(prof.is_admin) };
   } else {
     const { data: student, error: stErr } = await client
       .from("students").select("id, name, email").eq("email", email).maybeSingle();
@@ -106,6 +115,11 @@ export async function refreshCache() {
       cache.students = rows.map((r) => ({
         id: r.id, grade: r.grade, classNo: r.class_no, studentNo: r.student_no,
         name: r.name, email: r.email, createdAt: r.created_at,
+      }));
+    }],
+    ["professors", client.from("professors").select("*").order("email"), (rows) => {
+      cache.professors = rows.map((r) => ({
+        email: r.email, name: r.name, isAdmin: Boolean(r.is_admin),
       }));
     }],
     ["videos", client.from("videos").select("*").order("updated_at"), (rows) => {
@@ -178,6 +192,16 @@ export function pushStudent(s) {
 
 export function pushDeleteStudent(id) {
   client.from("students").delete().eq("id", id).then(report("학생 삭제"));
+}
+
+export function pushProfessor(p) {
+  client.from("professors").upsert({
+    email: p.email, name: p.name, is_admin: p.isAdmin ?? false,
+  }).then(report("교수"));
+}
+
+export function pushDeleteProfessor(email) {
+  client.from("professors").delete().eq("email", email).then(report("교수 삭제"));
 }
 
 export function pushVideoInsert(skillId, video) {

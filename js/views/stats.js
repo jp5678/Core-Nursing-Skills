@@ -1,6 +1,9 @@
 // 학습 현황 (교수) — 반별 / 학생별 / 술기별 통계
 import { getStudents, getSkills, getAllProgress, getCertificateByStudent } from "../store.js";
+import { CLASS_OPTIONS } from "../config.js";
 import { esc } from "../utils/dom.js";
+
+const GRADE_OPTIONS = [1, 2, 3, 4];
 
 function progressBar(ratio, label) {
   const pct = Math.round(ratio * 100);
@@ -44,8 +47,6 @@ export function renderStats(main) {
       });
 
     /* ----- 학생별 현황 ----- */
-    const grades = [...new Set(students.map((s) => s.grade))].sort();
-    const classes = [...new Set(students.map((s) => s.classNo))].sort();
     const studentRows = students
       .filter((st) =>
         (!gradeFilter || String(st.grade) === gradeFilter) &&
@@ -99,11 +100,11 @@ export function renderStats(main) {
         <div class="toolbar">
           <select id="grade-filter">
             <option value="">전체 학년</option>
-            ${grades.map((g) => `<option value="${g}" ${gradeFilter === String(g) ? "selected" : ""}>${g}학년</option>`).join("")}
+            ${GRADE_OPTIONS.map((g) => `<option value="${g}" ${gradeFilter === String(g) ? "selected" : ""}>${g}학년</option>`).join("")}
           </select>
           <select id="class-filter">
             <option value="">전체 반</option>
-            ${classes.map((c) => `<option value="${c}" ${classFilter === c ? "selected" : ""}>${c}반</option>`).join("")}
+            ${CLASS_OPTIONS.map((c) => `<option value="${c}" ${classFilter === c ? "selected" : ""}>${c}반</option>`).join("")}
           </select>
           <span class="muted">${studentRows.length}명 표시</span>
         </div>

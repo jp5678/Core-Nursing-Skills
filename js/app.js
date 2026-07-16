@@ -14,6 +14,7 @@ import { renderQuiz } from "./views/quiz.js?v=2";
 import { renderCertificates, renderCertificatePrint } from "./views/certificates.js";
 import { renderStats } from "./views/stats.js";
 import { renderAssignments } from "./views/assignments.js";
+import { renderProfessors } from "./views/professors.js";
 
 const app = document.getElementById("app");
 
@@ -75,7 +76,12 @@ function page(render, { professorOnly = false } = {}) {
 }
 
 function renderLayout(user) {
-  const items = NAV[user.role] ?? [];
+  const items = [...(NAV[user.role] ?? [])];
+  // 교수 관리는 관리자에게만 표시 (학생 관리 다음 위치)
+  if (user.role === "professor" && user.isAdmin) {
+    const idx = items.findIndex((i) => i.hash === "#/students") + 1;
+    items.splice(idx, 0, { hash: "#/professors", icon: "🧑‍🏫", label: "교수 관리" });
+  }
   const current = location.hash.split("/").slice(0, 2).join("/");
   app.innerHTML = `
     <div class="layout">
@@ -139,6 +145,7 @@ async function bootstrap() {
   route("#/stats", page(renderStats, { professorOnly: true }));
   route("#/assignments", page(renderAssignments));
   route("#/students", page(renderStudents, { professorOnly: true }));
+  route("#/professors", page(renderProfessors, { professorOnly: true }));
   route("#/videos", page(renderVideos, { professorOnly: true }));
   route("#/skills", page(renderSkillList));
   route("#/skills/:id", page(renderSkillDetail));
