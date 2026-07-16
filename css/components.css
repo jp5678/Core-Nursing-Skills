@@ -217,5 +217,8 @@ table.data tr:hover td { background: #f8fafc; }
 }
 .modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
 
+.class-checks { display: flex; gap: 10px; flex-wrap: wrap; padding: 8px 0; }
+.class-check { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer; }
+
 .empty-state { text-align: center; color: var(--c-text-sub); padding: 40px 20px; }
 .muted { color: var(--c-text-sub); font-size: 13px; }

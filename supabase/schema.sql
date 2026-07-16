@@ -30,12 +30,14 @@ create table if not exists public.videos (
 );
 
 create table if not exists public.assignments (
-  id          uuid primary key default gen_random_uuid(),
-  title       text not null,
-  description text not null default '',
-  due_date    date,
-  skill_id    int check (skill_id between 1 and 20),
-  created_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  title          text not null,
+  description    text not null default '',
+  due_date       date,
+  skill_id       int check (skill_id between 1 and 20),
+  target_grade   int check (target_grade between 1 and 4),  -- null = 전체 학년
+  target_classes text[],                                    -- null/빈 배열 = 전체 반
+  created_at     timestamptz not null default now()
 );
 
 create table if not exists public.submissions (

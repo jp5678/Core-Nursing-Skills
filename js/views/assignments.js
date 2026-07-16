@@ -1,10 +1,20 @@
 // 과제 — 교수: 부여·제출 현황 확인 / 학생: 제출·수정
 import {
-  getSkills, getSkill, getStudents, getStudent,
+  getSkills, getSkill, getStudent,
   getAssignments, addAssignment, updateAssignment, deleteAssignment,
   getSubmissions, getMySubmission, submitAssignment,
+  getEligibleStudents, getAssignmentsForStudent,
 } from "../store.js";
+import { CLASS_OPTIONS } from "../config.js";
 import { esc, el, formatDate } from "../utils/dom.js";
+
+// 대상 표시: "2학년 A·B반" / "전체 학년 C반" / "" (전체)
+function targetBadge(a) {
+  if (!a.targetGrade && !a.targetClasses?.length) return `<span class="badge info">대상: 전체</span>`;
+  const grade = a.targetGrade ? `${a.targetGrade}학년` : "전체 학년";
+  const classes = a.targetClasses?.length ? `${a.targetClasses.join("·")}반` : "전체 반";
+  return `<span class="badge info">대상: ${grade} ${classes}</span>`;
+}
 
 function dueBadge(assignment) {
   if (!assignment.dueDate) return `<span class="badge info">마감일 없음</span>`;
@@ -30,7 +40,6 @@ function drawProfessor(main) {
 
   function draw() {
     const assignments = getAssignments();
-    const students = getStudents();
 
     main.innerHTML = `
       <div class="page-head">
@@ -43,13 +52,14 @@ function drawProfessor(main) {
       </div>
       ${assignments.map((a) => {
         const subs = getSubmissions(a.id);
+        const eligible = getEligibleStudents(a);
         const opened = openedId === a.id;
         return `
         <div class="card">
           <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             ${esc(a.title)}
-            ${dueBadge(a)} ${skillBadge(a)}
-            <span class="badge ${subs.length ? "ok" : "pending"}">제출 ${subs.length} / ${students.length}명</span>
+            ${dueBadge(a)} ${targetBadge(a)} ${skillBadge(a)}
+            <span class="badge ${subs.length ? "ok" : "pending"}">제출 ${subs.length} / ${eligible.length}명</span>
           </h2>
           ${a.description ? `<p style="white-space:pre-line;margin-bottom:10px">${esc(a.description)}</p>` : ""}
           <div class="muted">등록일 ${formatDate(a.createdAt)}</div>
@@ -118,6 +128,19 @@ function drawProfessor(main) {
                   <option value="">선택 안 함</option>
                   ${skills.map((s) => `<option value="${s.id}" ${assignment?.skillId === s.id ? "selected" : ""}>${s.id}. ${esc(s.name)}</option>`).join("")}
                 </select></div>
+              <div class="field"><label>대상 학년</label>
+                <select name="targetGrade">
+                  <option value="">전체 학년</option>
+                  ${[1, 2, 3, 4].map((g) => `<option value="${g}" ${assignment?.targetGrade === g ? "selected" : ""}>${g}학년</option>`).join("")}
+                </select></div>
+              <div class="field"><label>대상 반 (선택 안 하면 전체)</label>
+                <div class="class-checks">
+                  ${CLASS_OPTIONS.map((c) => `
+                    <label class="class-check">
+                      <input type="checkbox" name="targetClasses" value="${c}"
+                        ${assignment?.targetClasses?.includes(c) ? "checked" : ""} /> ${c}반
+                    </label>`).join("")}
+                </div></div>
             </div>
             <div class="form-error" id="form-error"></div>
             <div class="form-actions">
@@ -132,7 +155,9 @@ function drawProfessor(main) {
     modal.querySelector("#cancel-btn").addEventListener("click", () => modal.remove());
     modal.querySelector("#assignment-form").addEventListener("submit", (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target).entries());
+      const fd = new FormData(e.target);
+      const data = Object.fromEntries(fd.entries());
+      data.targetClasses = fd.getAll("targetClasses");
       const result = assignment ? updateAssignment(assignment.id, data) : addAssignment(data);
       if (!result.ok) {
         modal.querySelector("#form-error").innerHTML = result.errors.map(esc).join("<br/>");
@@ -149,7 +174,8 @@ function drawProfessor(main) {
 /* ===== 학생 ===== */
 function drawStudent(main, user) {
   function draw() {
-    const assignments = getAssignments();
+    // 본인 학년·반이 대상인 과제만 표시
+    const assignments = getAssignmentsForStudent(user.studentId);
     main.innerHTML = `
       <div class="page-head">
         <h1>과제</h1>

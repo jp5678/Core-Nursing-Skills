@@ -344,6 +344,8 @@ function validateAssignment(data) {
   const errors = [];
   if (!data.title?.trim()) errors.push("과제 제목을 입력해 주세요.");
   if (data.dueDate && Number.isNaN(new Date(data.dueDate).getTime())) errors.push("마감일이 올바르지 않습니다.");
+  if (data.targetGrade && ![1, 2, 3, 4].includes(Number(data.targetGrade))) errors.push("대상 학년이 올바르지 않습니다.");
+  if (data.targetClasses?.some((c) => !CLASS_OPTIONS.includes(c))) errors.push("대상 반이 올바르지 않습니다.");
   return errors;
 }
 
@@ -353,7 +355,26 @@ function normalizeAssignment(data) {
     description: data.description?.trim() ?? "",
     dueDate: data.dueDate || null,
     skillId: data.skillId ? Number(data.skillId) : null,
+    targetGrade: data.targetGrade ? Number(data.targetGrade) : null,      // null = 전체 학년
+    targetClasses: data.targetClasses?.length ? [...data.targetClasses] : null, // null = 전체 반
   };
+}
+
+// 과제가 해당 학생을 대상으로 하는지 (전체 = null)
+export function isAssignmentForStudent(assignment, student) {
+  if (!student) return false;
+  if (assignment.targetGrade && student.grade !== assignment.targetGrade) return false;
+  if (assignment.targetClasses?.length && !assignment.targetClasses.includes(student.classNo)) return false;
+  return true;
+}
+
+export function getEligibleStudents(assignment) {
+  return getStudents().filter((s) => isAssignmentForStudent(assignment, s));
+}
+
+export function getAssignmentsForStudent(studentId) {
+  const student = getStudent(studentId);
+  return getAssignments().filter((a) => isAssignmentForStudent(a, student));
 }
 
 export function addAssignment(data) {

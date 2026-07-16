@@ -40,7 +40,7 @@ export function loginStudentByEmail(email) {
     (s) => s.email.toLowerCase() === email.trim().toLowerCase()
   );
   if (!student) {
-    return { ok: false, error: `${email} 계정으로 등록된 학생이 없습니다. 교수님께 등록을 요청하세요.` };
+    return { ok: false, error: `${email} 계정으로 등록된 학생이 없습니다. 정종필 교수님께 등록을 요청하세요.` };
   }
   const session = { role: "student", studentId: student.id, name: student.name, email: student.email };
   setSession(session);

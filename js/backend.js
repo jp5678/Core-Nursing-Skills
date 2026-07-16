@@ -76,12 +76,17 @@ export async function initBackend() {
   }
   try {
     await buildAuthContext(session.user.email);
-    // 교수 탭에서 로그인했는데 교수 허용 목록에 없는 계정이면 거부
+    // 선택한 탭과 계정 유형이 일치하지 않으면 거부
     const intended = sessionStorage.getItem("cnsp.intendedRole");
     sessionStorage.removeItem("cnsp.intendedRole");
     if (intended === "professor" && authContext?.role !== "professor") {
       throw new Error(
-        `${session.user.email} 계정은 교수 허용 목록에 등록되어 있지 않습니다. 관리자(정종필 교수)에게 등록을 요청하세요.`
+        `${session.user.email} 계정은 교수 허용 목록에 등록되어 있지 않습니다. 정종필 교수님께 등록을 요청하세요.`
+      );
+    }
+    if (intended === "student" && authContext?.role !== "student") {
+      throw new Error(
+        `${session.user.email} 계정은 교수 계정입니다. [교수] 탭에서 로그인해 주세요.`
       );
     }
   } catch (err) {
@@ -104,7 +109,7 @@ async function buildAuthContext(email) {
       .from("students").select("id, name, email").eq("email", email).maybeSingle();
     if (stErr) throw new Error(`학생 확인 실패: ${stErr.message}`);
     if (!student) {
-      throw new Error(`${email} 계정은 등록되어 있지 않습니다. 교수님께 등록을 요청하세요.`);
+      throw new Error(`${email} 계정은 등록되어 있지 않습니다. 정종필 교수님께 등록을 요청하세요.`);
     }
     authContext = { role: "student", studentId: student.id, name: student.name, email };
   }
@@ -159,7 +164,10 @@ export async function refreshCache() {
     ["assignments", client.from("assignments").select("*").order("created_at", { ascending: false }), (rows) => {
       cache.assignments = rows.map((r) => ({
         id: r.id, title: r.title, description: r.description,
-        dueDate: r.due_date, skillId: r.skill_id, createdAt: r.created_at,
+        dueDate: r.due_date, skillId: r.skill_id,
+        targetGrade: r.target_grade ?? null,
+        targetClasses: r.target_classes?.length ? r.target_classes : null,
+        createdAt: r.created_at,
       }));
     }],
     ["submissions", client.from("submissions").select("*"), (rows) => {
@@ -222,6 +230,7 @@ export function pushAssignment(a) {
   client.from("assignments").upsert({
     id: a.id, title: a.title, description: a.description,
     due_date: a.dueDate, skill_id: a.skillId,
+    target_grade: a.targetGrade, target_classes: a.targetClasses,
   }).then(report("과제"));
 }
 
