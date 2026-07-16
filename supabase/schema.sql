@@ -22,9 +22,29 @@ create table if not exists public.students (
 );
 
 create table if not exists public.videos (
-  skill_id   int primary key check (skill_id between 1 and 20),
+  id         uuid primary key default gen_random_uuid(),
+  skill_id   int not null check (skill_id between 1 and 20),
   url        text not null,
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.assignments (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null,
+  description text not null default '',
+  due_date    date,
+  skill_id    int check (skill_id between 1 and 20),
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.submissions (
+  id            uuid primary key default gen_random_uuid(),
+  assignment_id uuid not null references public.assignments(id) on delete cascade,
+  student_id    uuid not null references public.students(id) on delete cascade,
+  content       text not null default '',
+  link_url      text not null default '',
+  submitted_at  timestamptz not null default now(),
+  unique (assignment_id, student_id)
 );
 
 create table if not exists public.progress (
@@ -122,6 +142,34 @@ drop policy if exists quiz_insert on public.quiz_results;
 create policy quiz_insert on public.quiz_results
   for insert to authenticated
   with check (is_professor() or student_id = current_student_id());
+
+-- assignments: 조회는 로그인 사용자, 등록/수정/삭제는 교수만
+alter table public.assignments enable row level security;
+drop policy if exists assignments_select on public.assignments;
+create policy assignments_select on public.assignments
+  for select to authenticated using (true);
+drop policy if exists assignments_write on public.assignments;
+create policy assignments_write on public.assignments
+  for all to authenticated using (is_professor()) with check (is_professor());
+
+-- submissions: 학생은 본인 제출물만 생성/수정/조회, 교수는 전체
+alter table public.submissions enable row level security;
+drop policy if exists submissions_select on public.submissions;
+create policy submissions_select on public.submissions
+  for select to authenticated
+  using (is_professor() or student_id = current_student_id());
+drop policy if exists submissions_insert on public.submissions;
+create policy submissions_insert on public.submissions
+  for insert to authenticated
+  with check (is_professor() or student_id = current_student_id());
+drop policy if exists submissions_update on public.submissions;
+create policy submissions_update on public.submissions
+  for update to authenticated
+  using (is_professor() or student_id = current_student_id())
+  with check (is_professor() or student_id = current_student_id());
+drop policy if exists submissions_delete on public.submissions;
+create policy submissions_delete on public.submissions
+  for delete to authenticated using (is_professor());
 
 -- certificates: 학생은 본인 것 조회, 발급/취소는 교수만
 drop policy if exists cert_select on public.certificates;

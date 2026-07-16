@@ -9,8 +9,10 @@ export function renderSkillDetail(main, params, user) {
     main.innerHTML = `<div class="card empty-state">술기 항목을 찾을 수 없습니다. <a href="#/skills">목록으로</a></div>`;
     return;
   }
-  const video = getVideos()[skill.id];
-  const embed = toYouTubeEmbed(video?.url);
+  const videoList = getVideos()[skill.id] ?? [];
+  const embeds = videoList
+    .map((v) => toYouTubeEmbed(v.url))
+    .filter(Boolean);
   const isStudent = user.role === "student";
   const p = isStudent ? getProgress(user.studentId)[skill.id] : null;
 
@@ -28,11 +30,13 @@ export function renderSkillDetail(main, params, user) {
     <div class="grid cols-2">
       <div>
         <div class="card">
-          <h2>🎬 교육 영상</h2>
-          ${embed
-            ? `<iframe class="video-frame" src="${esc(embed)}" title="${esc(skill.name)} 교육 영상"
-                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                 allowfullscreen></iframe>`
+          <h2>🎬 교육 영상${embeds.length > 1 ? ` (${embeds.length}개)` : ""}</h2>
+          ${embeds.length
+            ? embeds.map((embed, i) => `
+                ${embeds.length > 1 ? `<div class="video-label">영상 ${i + 1}</div>` : ""}
+                <iframe class="video-frame" src="${esc(embed)}" title="${esc(skill.name)} 교육 영상 ${i + 1}"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen></iframe>`).join("")
             : `<div class="video-empty"><span style="font-size:32px">🎬</span>
                  <span>아직 등록된 영상이 없습니다.</span>
                  ${user.role === "professor" ? `<a href="#/videos" class="btn btn-outline btn-sm">영상 등록하러 가기</a>` : ""}

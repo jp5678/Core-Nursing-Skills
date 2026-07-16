@@ -10,14 +10,20 @@ let initError = null;
 
 const cache = {
   students: [],
-  videos: {},
+  videos: {},        // skillId → [ { id, url, updatedAt }, ... ]
   progress: {},
   quizResults: [],
   certificates: [],
+  assignments: [],
+  submissions: [],
 };
 
 export function isRemote() {
   if (globalThis.__FORCE_LOCAL_MODE__) return false; // 단위 테스트용
+  try {
+    // 개발·시연용: localStorage에 cnsp.forceLocal=1 을 넣으면 로컬 데모 모드로 동작
+    if (globalThis.localStorage?.getItem("cnsp.forceLocal") === "1") return false;
+  } catch { /* localStorage 접근 불가 환경 무시 */ }
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
@@ -92,43 +98,64 @@ async function buildAuthContext(email) {
 }
 
 // 서버 데이터를 캐시로 동기화 (RLS가 역할에 맞게 행을 걸러줌)
+// 테이블별로 독립 처리: 일부 실패(예: 마이그레이션 전)해도 나머지는 동작
 export async function refreshCache() {
   if (!client || !authContext) return;
-  const [students, videos, progress, quizResults, certificates] = await Promise.all([
-    client.from("students").select("*").order("student_no"),
-    client.from("videos").select("*"),
-    client.from("progress").select("*"),
-    client.from("quiz_results").select("*"),
-    client.from("certificates").select("*"),
-  ]);
-  const failed = [students, videos, progress, quizResults, certificates].find((r) => r.error);
-  if (failed) {
-    console.error("데이터 동기화 실패:", failed.error);
-    return;
-  }
-  cache.students = students.data.map((r) => ({
-    id: r.id, grade: r.grade, classNo: r.class_no, studentNo: r.student_no,
-    name: r.name, email: r.email, createdAt: r.created_at,
-  }));
-  cache.videos = Object.fromEntries(
-    videos.data.map((r) => [r.skill_id, { url: r.url, updatedAt: r.updated_at }])
-  );
-  cache.progress = {};
-  for (const r of progress.data) {
-    cache.progress[r.student_id] ??= {};
-    cache.progress[r.student_id][r.skill_id] = {
-      videoWatched: r.video_watched, bestScore: r.best_score,
-      passed: r.passed, updatedAt: r.updated_at,
-    };
-  }
-  cache.quizResults = quizResults.data.map((r) => ({
-    id: r.id, studentId: r.student_id, skillId: r.skill_id,
-    score: r.score, total: r.total, createdAt: r.created_at,
-  }));
-  cache.certificates = certificates.data.map((r) => ({
-    id: r.id, certNo: r.cert_no, studentId: r.student_id,
-    issuedBy: r.issued_by, passedCount: r.passed_count, issuedAt: r.issued_at,
-  }));
+  const tables = [
+    ["students", client.from("students").select("*").order("student_no"), (rows) => {
+      cache.students = rows.map((r) => ({
+        id: r.id, grade: r.grade, classNo: r.class_no, studentNo: r.student_no,
+        name: r.name, email: r.email, createdAt: r.created_at,
+      }));
+    }],
+    ["videos", client.from("videos").select("*").order("updated_at"), (rows) => {
+      cache.videos = {};
+      for (const r of rows) {
+        cache.videos[r.skill_id] ??= [];
+        cache.videos[r.skill_id].push({ id: r.id ?? `legacy-${r.skill_id}`, url: r.url, updatedAt: r.updated_at });
+      }
+    }],
+    ["progress", client.from("progress").select("*"), (rows) => {
+      cache.progress = {};
+      for (const r of rows) {
+        cache.progress[r.student_id] ??= {};
+        cache.progress[r.student_id][r.skill_id] = {
+          videoWatched: r.video_watched, bestScore: r.best_score,
+          passed: r.passed, updatedAt: r.updated_at,
+        };
+      }
+    }],
+    ["quiz_results", client.from("quiz_results").select("*"), (rows) => {
+      cache.quizResults = rows.map((r) => ({
+        id: r.id, studentId: r.student_id, skillId: r.skill_id,
+        score: r.score, total: r.total, createdAt: r.created_at,
+      }));
+    }],
+    ["certificates", client.from("certificates").select("*"), (rows) => {
+      cache.certificates = rows.map((r) => ({
+        id: r.id, certNo: r.cert_no, studentId: r.student_id,
+        issuedBy: r.issued_by, passedCount: r.passed_count, issuedAt: r.issued_at,
+      }));
+    }],
+    ["assignments", client.from("assignments").select("*").order("created_at", { ascending: false }), (rows) => {
+      cache.assignments = rows.map((r) => ({
+        id: r.id, title: r.title, description: r.description,
+        dueDate: r.due_date, skillId: r.skill_id, createdAt: r.created_at,
+      }));
+    }],
+    ["submissions", client.from("submissions").select("*"), (rows) => {
+      cache.submissions = rows.map((r) => ({
+        id: r.id, assignmentId: r.assignment_id, studentId: r.student_id,
+        content: r.content, linkUrl: r.link_url, submittedAt: r.submitted_at,
+      }));
+    }],
+  ];
+  const results = await Promise.all(tables.map(([, query]) => query));
+  results.forEach((result, i) => {
+    const [name, , apply] = tables[i];
+    if (result.error) console.error(`${name} 동기화 실패:`, result.error.message);
+    else apply(result.data);
+  });
 }
 
 // ---------- 쓰기 반영 (캐시는 store.js가 이미 갱신한 상태) ----------
@@ -153,13 +180,31 @@ export function pushDeleteStudent(id) {
   client.from("students").delete().eq("id", id).then(report("학생 삭제"));
 }
 
-export function pushVideo(skillId, video) {
-  if (video) {
-    client.from("videos").upsert({ skill_id: Number(skillId), url: video.url })
-      .then(report("영상"));
-  } else {
-    client.from("videos").delete().eq("skill_id", Number(skillId)).then(report("영상 삭제"));
-  }
+export function pushVideoInsert(skillId, video) {
+  client.from("videos").insert({ id: video.id, skill_id: Number(skillId), url: video.url })
+    .then(report("영상"));
+}
+
+export function pushVideoDelete(videoId) {
+  client.from("videos").delete().eq("id", videoId).then(report("영상 삭제"));
+}
+
+export function pushAssignment(a) {
+  client.from("assignments").upsert({
+    id: a.id, title: a.title, description: a.description,
+    due_date: a.dueDate, skill_id: a.skillId,
+  }).then(report("과제"));
+}
+
+export function pushDeleteAssignment(id) {
+  client.from("assignments").delete().eq("id", id).then(report("과제 삭제"));
+}
+
+export function pushSubmission(s) {
+  client.from("submissions").upsert({
+    id: s.id, assignment_id: s.assignmentId, student_id: s.studentId,
+    content: s.content, link_url: s.linkUrl, submitted_at: s.submittedAt,
+  }, { onConflict: "assignment_id,student_id" }).then(report("과제 제출"));
 }
 
 export function pushProgress(studentId, skillId, p) {

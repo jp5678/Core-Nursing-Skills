@@ -39,7 +39,7 @@ export function renderDashboard(main) {
       </div>
       <div class="card stat-tile">
         <div class="label">등록된 술기 영상</div>
-        <div class="value">${Object.keys(videos).length}<span style="font-size:16px"> / ${skills.length}</span></div>
+        <div class="value">${Object.values(videos).filter((list) => list.length).length}<span style="font-size:16px"> / ${skills.length}</span></div>
         <div class="hint">영상 관리에서 등록</div>
       </div>
       <div class="card stat-tile">

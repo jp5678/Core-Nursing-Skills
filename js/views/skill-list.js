@@ -30,7 +30,7 @@ export function renderSkillList(main, _params, user) {
     <div class="skill-grid">
       ${skills.map((skill) => {
         const p = progress[skill.id];
-        const hasVideo = Boolean(videos[skill.id]);
+        const videoCount = videos[skill.id]?.length ?? 0;
         return `
         <a class="skill-card" href="#/skills/${skill.id}">
           <div class="no">핵심기본간호술 ${skill.id}</div>
@@ -38,7 +38,7 @@ export function renderSkillList(main, _params, user) {
           <div class="meta">
             <span class="badge diff-${skill.difficulty}">난이도 ${skill.difficulty}</span>
             <span class="badge info">${skill.timeMinutes}분</span>
-            ${hasVideo ? `<span class="badge info">🎬 영상</span>` : ""}
+            ${videoCount ? `<span class="badge info">🎬 영상 ${videoCount > 1 ? videoCount : ""}</span>` : ""}
           </div>
           ${isStudent ? `
             <div class="status">

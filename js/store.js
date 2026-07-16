@@ -4,8 +4,9 @@ import { SKILLS } from "./data/skills-data.js";
 import { CLASS_OPTIONS } from "./config.js";
 import {
   isRemote, getCache,
-  pushStudent, pushDeleteStudent, pushVideo, pushProgress,
+  pushStudent, pushDeleteStudent, pushVideoInsert, pushVideoDelete, pushProgress,
   pushQuizResult, pushCertificate, pushDeleteCertificate,
+  pushAssignment, pushDeleteAssignment, pushSubmission,
 } from "./backend.js";
 
 const PREFIX = "cnsp.";
@@ -15,6 +16,8 @@ const KEYS = {
   progress: `${PREFIX}progress`,
   quizResults: `${PREFIX}quizResults`,
   certificates: `${PREFIX}certificates`,
+  assignments: `${PREFIX}assignments`,
+  submissions: `${PREFIX}submissions`,
   session: `${PREFIX}session`,
   seeded: `${PREFIX}seeded.v1`,
   demoUpgraded: `${PREFIX}migration.demoFullCompletion`,
@@ -130,23 +133,48 @@ export function deleteStudent(id) {
   }
 }
 
-/* ===== 영상 (skillId → { url, updatedAt }) ===== */
+/* ===== 영상 (skillId → [ { id, url, updatedAt }, ... ]) ===== */
 export function getVideos() {
   return isRemote() ? getCache().videos : read(KEYS.videos, {});
 }
 
-export function setVideo(skillId, url) {
-  const videos = getVideos();
-  const entry = url ? { url, updatedAt: new Date().toISOString() } : null;
-  const next = entry
-    ? { ...videos, [skillId]: entry }
-    : Object.fromEntries(Object.entries(videos).filter(([k]) => k !== String(skillId)));
-  if (isRemote()) {
-    getCache().videos = next;
-    pushVideo(skillId, entry);
-  } else {
-    write(KEYS.videos, next);
+function writeVideos(videos) {
+  if (isRemote()) getCache().videos = videos;
+  else write(KEYS.videos, videos);
+}
+
+export function addVideo(skillId, url) {
+  const video = { id: uid(), url: url.trim(), updatedAt: new Date().toISOString() };
+  const all = getVideos();
+  writeVideos({ ...all, [skillId]: [...(all[skillId] ?? []), video] });
+  if (isRemote()) pushVideoInsert(skillId, video);
+  return video;
+}
+
+export function removeVideo(skillId, videoId) {
+  const all = getVideos();
+  const list = (all[skillId] ?? []).filter((v) => v.id !== videoId);
+  const next = { ...all };
+  if (list.length) next[skillId] = list;
+  else delete next[skillId];
+  writeVideos(next);
+  if (isRemote()) pushVideoDelete(videoId);
+}
+
+// 구버전(술기당 1개 객체) 로컬 데이터 → 배열 형태로 변환
+function migrateVideosShape() {
+  const videos = read(KEYS.videos, {});
+  let changed = false;
+  const next = {};
+  for (const [skillId, value] of Object.entries(videos)) {
+    if (Array.isArray(value)) {
+      next[skillId] = value;
+    } else {
+      next[skillId] = [{ id: uid(), url: value.url, updatedAt: value.updatedAt }];
+      changed = true;
+    }
   }
+  if (changed) write(KEYS.videos, next);
 }
 
 /* ===== 진도 (studentId → skillId → { videoWatched, bestScore, passed }) ===== */
@@ -248,6 +276,95 @@ export function revokeCertificate(certId) {
   }
 }
 
+/* ===== 과제 ===== */
+export function getAssignments() {
+  return isRemote() ? getCache().assignments : read(KEYS.assignments, []);
+}
+
+function writeAssignmentList(list) {
+  if (isRemote()) getCache().assignments = list;
+  else write(KEYS.assignments, list);
+}
+
+function validateAssignment(data) {
+  const errors = [];
+  if (!data.title?.trim()) errors.push("과제 제목을 입력해 주세요.");
+  if (data.dueDate && Number.isNaN(new Date(data.dueDate).getTime())) errors.push("마감일이 올바르지 않습니다.");
+  return errors;
+}
+
+function normalizeAssignment(data) {
+  return {
+    title: data.title.trim(),
+    description: data.description?.trim() ?? "",
+    dueDate: data.dueDate || null,
+    skillId: data.skillId ? Number(data.skillId) : null,
+  };
+}
+
+export function addAssignment(data) {
+  const errors = validateAssignment(data);
+  if (errors.length) return { ok: false, errors };
+  const assignment = { id: uid(), ...normalizeAssignment(data), createdAt: new Date().toISOString() };
+  writeAssignmentList([assignment, ...getAssignments()]);
+  if (isRemote()) pushAssignment(assignment);
+  return { ok: true, assignment };
+}
+
+export function updateAssignment(id, data) {
+  const errors = validateAssignment(data);
+  if (errors.length) return { ok: false, errors };
+  const next = getAssignments().map((a) => (a.id === id ? { ...a, ...normalizeAssignment(data) } : a));
+  writeAssignmentList(next);
+  if (isRemote()) pushAssignment(next.find((a) => a.id === id));
+  return { ok: true };
+}
+
+export function deleteAssignment(id) {
+  writeAssignmentList(getAssignments().filter((a) => a.id !== id));
+  const submissions = getSubmissions().filter((s) => s.assignmentId !== id);
+  if (isRemote()) {
+    getCache().submissions = submissions;
+    pushDeleteAssignment(id); // DB 쪽은 on delete cascade가 제출물 정리
+  } else {
+    write(KEYS.submissions, submissions);
+  }
+}
+
+/* ===== 과제 제출 ===== */
+export function getSubmissions(assignmentId = null) {
+  const all = isRemote() ? getCache().submissions : read(KEYS.submissions, []);
+  return assignmentId ? all.filter((s) => s.assignmentId === assignmentId) : all;
+}
+
+export function getMySubmission(assignmentId, studentId) {
+  return getSubmissions(assignmentId).find((s) => s.studentId === studentId) ?? null;
+}
+
+export function submitAssignment({ assignmentId, studentId, content, linkUrl }) {
+  const trimmedContent = content?.trim() ?? "";
+  const trimmedLink = linkUrl?.trim() ?? "";
+  if (!trimmedContent && !trimmedLink) {
+    return { ok: false, errors: ["제출 내용 또는 링크 중 하나는 입력해야 합니다."] };
+  }
+  if (trimmedLink && !/^https?:\/\/\S+$/.test(trimmedLink)) {
+    return { ok: false, errors: ["링크는 http(s)://로 시작하는 주소여야 합니다."] };
+  }
+  const existing = getMySubmission(assignmentId, studentId);
+  const submission = {
+    id: existing?.id ?? uid(),
+    assignmentId, studentId,
+    content: trimmedContent, linkUrl: trimmedLink,
+    submittedAt: new Date().toISOString(),
+  };
+  const rest = getSubmissions().filter((s) => s.id !== submission.id);
+  const next = [...rest, submission];
+  if (isRemote()) getCache().submissions = next;
+  else write(KEYS.submissions, next);
+  if (isRemote()) pushSubmission(submission);
+  return { ok: true, submission };
+}
+
 /* ===== 세션 ===== */
 export function getSession() {
   return read(KEYS.session, null);
@@ -297,6 +414,7 @@ export function seedIfEmpty() {
   }
   upgradeDemoStudent();
   migrateDemoEmails();
+  migrateVideosShape();
 }
 
 // 구버전 시드의 데모 학생 이메일을 s001~s008@scjc.ac.kr 로 1회 변경

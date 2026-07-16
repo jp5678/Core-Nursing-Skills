@@ -12,6 +12,8 @@ import { renderSkillList } from "./views/skill-list.js";
 import { renderSkillDetail } from "./views/skill-detail.js";
 import { renderQuiz } from "./views/quiz.js?v=2";
 import { renderCertificates, renderCertificatePrint } from "./views/certificates.js";
+import { renderStats } from "./views/stats.js";
+import { renderAssignments } from "./views/assignments.js";
 
 const app = document.getElementById("app");
 
@@ -26,13 +28,16 @@ const STETHOSCOPE_ICON = `<svg width="19" height="19" viewBox="0 0 24 24" fill="
 const NAV = {
   professor: [
     { hash: "#/dashboard", icon: "📊", label: "대시보드" },
+    { hash: "#/stats", icon: "📈", label: "학습 현황" },
     { hash: "#/students", icon: "👥", label: "학생 관리" },
     { hash: "#/skills", icon: STETHOSCOPE_ICON, label: "술기 목록" },
     { hash: "#/videos", icon: "🎬", label: "영상 관리" },
+    { hash: "#/assignments", icon: "📋", label: "과제 관리" },
     { hash: "#/certificates", icon: "📜", label: "수료증 관리" },
   ],
   student: [
     { hash: "#/skills", icon: STETHOSCOPE_ICON, label: "술기 학습" },
+    { hash: "#/assignments", icon: "📋", label: "과제" },
     { hash: "#/certificates", icon: "📜", label: "내 수료증" },
   ],
 };
@@ -131,6 +136,8 @@ async function bootstrap() {
 
   route("#/", home);
   route("#/dashboard", page(renderDashboard, { professorOnly: true }));
+  route("#/stats", page(renderStats, { professorOnly: true }));
+  route("#/assignments", page(renderAssignments));
   route("#/students", page(renderStudents, { professorOnly: true }));
   route("#/videos", page(renderVideos, { professorOnly: true }));
   route("#/skills", page(renderSkillList));

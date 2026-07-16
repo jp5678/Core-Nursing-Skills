@@ -138,6 +138,17 @@ table.data tr:hover td { background: #f8fafc; }
 .step-item.critical .step-text::after { content: " ★"; color: #dc2626; font-weight: 700; }
 
 .video-frame { aspect-ratio: 16/9; width: 100%; border: none; border-radius: 10px; background: #0f172a; }
+.video-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 8px; margin-bottom: 8px;
+  font-size: 13px;
+}
+.video-row .video-url { flex: 1; min-width: 200px; word-break: break-all; color: var(--c-text); }
+.video-add { display: flex; gap: 8px; margin-top: 8px; }
+.video-add input {
+  flex: 1; padding: 8px 12px; border: 1px solid var(--c-border); border-radius: 8px;
+}
+.video-label { font-size: 13px; font-weight: 700; color: var(--c-text-sub); margin: 12px 0 6px; }
 .video-empty {
   aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;
   flex-direction: column; gap: 8px; background: #f1f5f9; border-radius: 10px;

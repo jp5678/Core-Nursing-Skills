@@ -1,62 +1,58 @@
-// 술기 영상 관리 (교수) — 술기별 YouTube URL 등록
-import { getSkills, getVideos, setVideo } from "../store.js";
+// 술기 영상 관리 (교수) — 술기별로 YouTube URL 여러 개 등록
+import { getSkills, getVideos, addVideo, removeVideo } from "../store.js";
 import { esc, toYouTubeEmbed, formatDate } from "../utils/dom.js";
 
 export function renderVideos(main) {
   function draw() {
     const skills = getSkills();
     const videos = getVideos();
+    const totalCount = Object.values(videos).reduce((n, list) => n + list.length, 0);
+
     main.innerHTML = `
       <div class="page-head">
         <h1>임상 술기 영상 관리</h1>
-        <div class="sub">술기 항목별 교육 영상(YouTube)을 등록하세요. 학생 학습 화면에 자동으로 표시됩니다.</div>
+        <div class="sub">술기별 교육 영상(YouTube)을 여러 개 등록할 수 있습니다. 학생 학습 화면에 자동으로 표시됩니다.
+          (등록 ${totalCount}건)</div>
       </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table class="data">
-            <thead><tr>
-              <th>#</th><th>술기 항목</th><th>난이도</th><th style="width:38%">YouTube URL</th><th>상태</th><th></th>
-            </tr></thead>
-            <tbody>
-              ${skills.map((skill) => {
-                const video = videos[skill.id];
-                return `
-                <tr>
-                  <td>${skill.id}</td>
-                  <td>${esc(skill.name)}</td>
-                  <td><span class="badge diff-${skill.difficulty}">${skill.difficulty}</span></td>
-                  <td><input style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:6px"
-                        data-url="${skill.id}" value="${esc(video?.url ?? "")}"
-                        placeholder="https://www.youtube.com/watch?v=..." /></td>
-                  <td>${video
-                    ? `<span class="badge ok">등록됨</span><div class="muted">${formatDate(video.updatedAt)}</div>`
-                    : `<span class="badge pending">미등록</span>`}</td>
-                  <td style="white-space:nowrap">
-                    <button class="btn btn-primary btn-sm" data-save="${skill.id}">저장</button>
-                    ${video ? `<button class="btn btn-danger btn-sm" data-remove="${skill.id}">삭제</button>` : ""}
-                  </td>
-                </tr>`;
-              }).join("")}
-            </tbody>
-          </table>
-        </div>
-        <p class="muted" style="margin-top:10px">지원 형식: youtube.com/watch, youtu.be, shorts, embed 링크</p>
-      </div>`;
+      ${skills.map((skill) => {
+        const list = videos[skill.id] ?? [];
+        return `
+        <div class="card">
+          <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${skill.id}. ${esc(skill.name)}
+            <span class="badge diff-${skill.difficulty}">${skill.difficulty}</span>
+            ${list.length ? `<span class="badge ok">영상 ${list.length}개</span>` : `<span class="badge pending">미등록</span>`}
+          </h2>
+          ${list.map((v, i) => `
+            <div class="video-row">
+              <span class="badge info">영상 ${i + 1}</span>
+              <span class="video-url">${esc(v.url)}</span>
+              <span class="muted">${formatDate(v.updatedAt)}</span>
+              <button class="btn btn-danger btn-sm" data-remove="${skill.id}" data-video="${v.id}">삭제</button>
+            </div>`).join("")}
+          <div class="video-add">
+            <input data-url="${skill.id}" placeholder="https://www.youtube.com/watch?v=..." />
+            <button class="btn btn-primary btn-sm" data-add="${skill.id}">＋ 영상 추가</button>
+          </div>
+        </div>`;
+      }).join("")}
+      <p class="muted">지원 형식: youtube.com/watch, youtu.be, shorts, embed 링크</p>`;
 
-    main.querySelectorAll("[data-save]").forEach((btn) =>
+    main.querySelectorAll("[data-add]").forEach((btn) =>
       btn.addEventListener("click", () => {
-        const skillId = btn.dataset.save;
-        const url = main.querySelector(`[data-url="${skillId}"]`).value.trim();
+        const skillId = btn.dataset.add;
+        const input = main.querySelector(`[data-url="${skillId}"]`);
+        const url = input.value.trim();
         if (!url) { alert("URL을 입력해 주세요."); return; }
         if (!toYouTubeEmbed(url)) { alert("올바른 YouTube 링크가 아닙니다."); return; }
-        setVideo(skillId, url);
+        addVideo(skillId, url);
         draw();
       })
     );
     main.querySelectorAll("[data-remove]").forEach((btn) =>
       btn.addEventListener("click", () => {
-        if (confirm("이 술기의 영상을 삭제할까요?")) {
-          setVideo(btn.dataset.remove, null);
+        if (confirm("이 영상을 삭제할까요?")) {
+          removeVideo(btn.dataset.remove, btn.dataset.video);
           draw();
         }
       })
